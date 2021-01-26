@@ -16,7 +16,7 @@ $keywords =  preg_split("/[\:]+/",trim(htmlentities($_POST['id'])));
 		$sharred_list=implode('","',$geneids_array);
 }
 
-$tintinvariable="at";
+$tintinvariable="";
 $table_name="transcript_info";
 
 $datatables = new Datatables();
@@ -28,28 +28,34 @@ $popgenie_genepages_config = array(
 'password' => $private_url['pass'], 
 'database' => str_replace('/', '', $private_url['path']), 
 'hostname' => $private_url['host']);
+
+//check prefix for gene id search
+$sql_get_one_gene_id ="select gene_id from gene_info limit 1";
+$gene_id_connection=mysqli_connect($private_url['host'], $private_url['user'], $private_url['pass'],str_replace('/', '', $private_url['path'])) or die(mysqli_error());
+$gene_id_results =mysqli_query($gene_id_connection,$sql_get_one_gene_id);
+$gene_id_array   = mysqli_fetch_assoc($gene_id_results);
+$tintinvariable= strtolower(substr(($gene_id_array)["gene_id"],0,2));
+mysqli_close($gene_id_connection); 
+
 // MYSQL configuration
 $datatables->connect($popgenie_genepages_config);
 $datatables
  
 
-->select(''.$table_name.'.gene_id as ID,"check_box_value",'.$table_name.'.gene_id as ids,'.$table_name.'.transcript_id,'.$table_name.'.chromosome_name,'.$table_name.'.description,transcript_potri.potri_id,transcript_atg.atg_id,gene_kegg.kegg_description,gene_atg.atg_description,gene_go.go_description,gene_pfam.pfam_description')
+->select(''.$table_name.'.gene_id as ID,"check_box_value",'.$table_name.'.gene_id as ids,'.$table_name.'.transcript_id,'.$table_name.'.chromosome_name,'.$table_name.'.description,transcript_potri.potri_id,transcript_atg.atg_id,gene_kegg.kegg_description,gene_arabidopsis.atg_description,gene_go.go_description,gene_pfam.pfam_description')
 ->from($table_name) 
 ->join('transcript_potri', 'transcript_potri.transcript_i=transcript_info.transcript_i', 'left')
 ->join('transcript_atg', 'transcript_atg.transcript_i=transcript_info.transcript_i', 'left')
 ->join('gene_kegg', 'gene_kegg.gene_i=transcript_info.gene_i', 'left')
-	->join('gene_atg', 'gene_atg.gene_i=transcript_info.gene_i', 'left')
+	->join('gene_arabidopsis', 'gene_arabidopsis.gene_i=transcript_info.gene_i', 'left')
 	->join('gene_go', 'gene_go.gene_i=transcript_info.gene_i', 'left')
 	->join('gene_pfam', 'gene_pfam.gene_i=transcript_info.gene_i', 'left')
-
 
 ->edit_column('ids', '<a target="_parent" href="gene?id=$1" target="_blank">$1</a>', 'ID') 
 ->edit_column(''.$table_name.'.transcript_id', '<a target="_blank" href="transcript?id=$1">$1</a>', ''.$table_name.'.transcript_id')
 
-->edit_column('transcript_potri.potri_id', '<a target="_blank" href="http://popgenie.org/transcript?id=$1">$1</a>', 'transcript_potri.potri_id') 
-->edit_column('transcript_atg.atg_id', '<a target="_blank" href="http://atgenie.org/transcript?id=$1">$1</a>', 'transcript_atg.atg_id') ;
-//->unset_column(''.$table_name.'.gene_end') ; 
-
+->edit_column('transcript_potri.potri_id', '<a target="_blank" href="https://popgenie.org/transcript?id=$1">$1</a>', 'transcript_potri.potri_id') 
+->edit_column('transcript_atg.atg_id', '<a target="_blank" href="https://atgenie.org/transcript?id=$1">$1</a>', 'transcript_atg.atg_id') ;
 
   
 if(isset($sharred_list)){
@@ -63,7 +69,7 @@ if(isset($_POST['id']) && $_POST['id'] != ''){
 	$pattern = '/^[a-zA-Z]+[.]+[a-zA-Z0-9]+[.]+[0-9]?[0-9]$/';
 	$flag=true;
 
-	if(checkprefix($onlyconsonants,$tintinvariable)==true && checkprefix($onlyconsonants,"at")==true){
+	if(checkprefix($onlyconsonants,$tintinvariable)==true ){
 		$flag=false;
 	$geneids_array = explode(",", $onlyconsonants);
 	$geneids_array_str=implode('","',$geneids_array);
@@ -84,14 +90,15 @@ if(isset($_POST['id']) && $_POST['id'] != ''){
 	$datatables->where('chromosome_name in ',$geneids_array_str);
 	}
 
-	if(checkprefix($onlyconsonants,"potri")==true   ){
+	// need some work before adding condition to the same species
+	if(checkprefix($onlyconsonants,"spotri")==true   ){
 	$flag=false;
 	$geneids_array = explode(",", $onlyconsonants);
 	$geneids_array_str=implode('","',$geneids_array);
 	$datatables->where('transcript_potri.potri_id in ',$geneids_array_str);
 	}
 	
-	if(checkprefix($onlyconsonants,"astg")==true   ){
+	if(checkprefix($onlyconsonants,"satg")==true   ){
 	$flag=false;
 	$geneids_array = explode(",", $onlyconsonants);
 	$geneids_array_str=implode('","',$geneids_array);

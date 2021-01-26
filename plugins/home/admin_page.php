@@ -7,8 +7,8 @@
        <li class='tab'><a href="#site">Site settings</a></li>
        <li class='tab'><a href="#db">Database settings</a></li>
        <li  class='tab'><a href="#annotation">Annotation</a></li>
-       <li class='tab'><a href="#expression">Expression</a></li>
-       <li class='tab'><a href="#network">Network</a></li>
+       <li style="display:none" class='tab'><a href="#expression">Expression</a></li>
+       <li  style="display:none" class='tab'><a href="#network">Network</a></li>
      </ul>
     <div class='panel-container'>
       <div id="page"> <br>
@@ -28,7 +28,7 @@
 <button id="btn_submit"  onclick='javascript:location.reload(true);'>save</button>
        <!--site section ended-->
 </div>
-      <div id="db"><br>
+      <div id="db"><br> 
       <!--db section start-->
       <h3>Loading novel genome to GenIE-Sys database. Follow the steps one at a time.</h3>
 <span style="overflow: hidden;position: absolute;top:30px" id="error_msg"></span>
@@ -36,21 +36,24 @@
    <p><label for="host">Host:&nbsp;&nbsp;&nbsp;</label><input autocomplete="host" id="mhost" value="localhost" placeholder="MySQL host : localhost" type="text"/> &#9432; This is the default host </p>
    <p><label for="username">Username:</label><input value="admin" autocomplete="username" id="musername" placeholder="MySQL username: admin" type="text"/> &#9432; This is the default username (MAMP uses root as default username) </p>
    <p><label for="password">Password:</label><input value="mypass" autocomplete="password" id="mpassword" placeholder="MySQL password : mypass" type="text"/> &#9432; This is the default password (MAMP uses root as default password)</p>
-   <p><label for="database">Database:</label><input id="mdbname" placeholder="Type in new database name" value="" type="text"/> &#9432; Current database name should be type in here</p>
+   <p><label for="database">Database:</label><input id="mdbname" placeholder="Type in new database name" value="" type="text"/> <span id="db_span">&#9432; Current database name should be type in here</span></p>
+   <p><label for="species">Species name:</label><input id="mspeciesname" placeholder="Type in new species name" value="" type="text"/> <span id="species_span">&#9432; Current species name should be type in here</span></p>
 </form>
 <br>
-<!--<h3> There is a database name stated in the setting file. Howevere that database does not exsist in MySQL server. Do you want to create a new database?</h3>-->
-<button class="upbtn"  id="create_db">create a fresh database</button>
-<!--<button class="upbtn"  id="create_db_arabidopsis">create a database with <i>Arabidopsis thaliana</i></button>-->
-<button id="drop_db" class="upbtn"  style="background:red;color:white">Delete current database</button>&nbsp; <span class="help_span">&#9432; First you have to create a database or use the existing database.</span> 
+
+<button id="drop_db" class="upbtn"  style="background:red;color:white;display:none">Delete current database</button>&nbsp; 
 <button class="upbtn" style="display:none"  id="download_indices">Download indices</button>
 <br><br>
 <div id="clone_div" style="border:dotted thin black;width:60%;border-radius:5px;padding:6px;display:none">
 <h4>Clone from the PlantGenIE core species. This includes all the annotation and expression data.</h4>
-<button class="upbtn deactive" onClick="clone_genome(this)"  id="potra" style="background:grey;color:white;border-color: grey;">Populus tremula</button>
-<button class="upbtn" onClick="clone_genome(this)" id="piabi" style="background:grey;color:white;border-color: grey;">Picea abies</button>
+<button class="upbtn" onClick="clone_genome(this)"  id="potra" >Populus tremula</button>
+<button class="upbtn" onClick="clone_genome(this)"  id="potri" >Populus trichocarpa</button>
+<button class="upbtn" onClick="clone_genome(this)" id="piabi" >Picea abies</button>
 <button class="upbtn" onClick="clone_genome(this)"  id="artha" >Arbidopsis thaliana</button>
-<button class="upbtn" onClick="clone_genome(this)"  id="eugra" style="background:grey;color:white;border-color: grey;">Eucalyptus grandis</button></br></br>
+<button class="upbtn" onClick="clone_genome(this)"  id="eugra" >Eucalyptus grandis</button></br></br>
+<hr>
+<button class="upbtn" onClick="clone_genome(this)"  id="dump" >Just create an empty database for different speices</button></br></br>
+
 </div>
 </br></br> 
 <a target="_blank" id="myadmin_links" style="color:blue;font-weight:bold;float:right;cursor:pointer">External link to phpMyAdmin page >></a><br>
@@ -91,7 +94,6 @@ There are some missing files in the data directory. Please upload the following 
         <input id="update_description_checkbox" type="checkbox" onchange="annotation_update_description()" name="task_3" value="1" class="tasks-list-cb">
         <span class="tasks-list-mark"></span>
         <span class="tasks-list-desc">Store description (gene and transcript) into the database </span><span id="update_description_waiting"> &nbsp;&nbsp; <img src='plugins/home/css/btnloader.GIF' /></span> 
-        <!--<a href='javascript:go_to_help(this);'>(help)</a>-->
       </label> 
 
 

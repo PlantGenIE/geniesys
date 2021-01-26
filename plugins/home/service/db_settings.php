@@ -1,74 +1,148 @@
 <?php
+
+require '../../../api/src/config/crypt.php';
+
 ini_set('memory_limit', '-1');
 ini_set('max_execution_time', 300);
-
 $host = trim($_POST['host']);
 $username = trim($_POST['username']);
 $password = trim($_POST['password']);
 $database = trim($_POST['database']);
+$species = trim($_POST['species']);
 $get_action = $_POST['action'];
 $get_name = $_POST['name'];
+$settings_array=array();
+
+//Read settings ini file & fill in the input boxes
+if ($get_action == "read_settings_ini") {
+    readInifile();
+}
+
+//Check connection
+if ($get_name == "check") {
+    readInifile();
+}
+
+//Check connection
+if ($get_action == "check_connection") {
+    checkConnection();
+}
+
+//Check database
+if ($get_action == "save_ini_file") {
+    saveSettings();
+}
+
+//Clone database
+if ($get_action == "") {
+
+}
+
+//Write  settings inifile
+if ($get_action == "") {
+
+}
+
+
+//Read ini file
+function readInifile(){
+    $ini_array = parse_ini_file("../../../genie_files/settings",true) or die("Unable to open file!");
+    $genieCrypt=new genieCrypt();
+    $host=$ini_array['settings'][host];
+    $user=$ini_array['settings'][username];
+    $pass=$genieCrypt->DecryptThis($ini_array['settings'][password]);
+    $database=$ini_array['settings'][database];
+    $species=$ini_array['settings'][species];
+    $ret=array();
+    $ret["host"]=$host;
+    $ret["user"]=$user;
+    $ret["pass"]=$pass;
+    $ret["database"]=$database;
+    $ret["species"]=$species;
+    $settings_array=$ret; 
+    $PHP_Pass=exec('echo $MYSQL_ADMIN_PASS');
+    $conn_init = mysqli_connect($host, $user, $PHP_Pass);
+    $conn = mysqli_connect($host, $user, $pass);
+    if($conn_init==true){
+        $conn= $conn_init;
+        $ret["pass"]=$PHP_Pass;
+    }
+    if (!$conn) {
+        jsonMsg('error', "Connection failed: " , json_encode($ret));
+    }else{
+        if (!mysqli_select_db($conn, $database)) {
+            jsonMsg('warning', "connection success but database not.", json_encode($ret));
+        }else{
+            jsonMsg('success', "Database and the server connection were established.", json_encode($ret));
+        }
+       
+    }
+}
 
 // output json information
-function jsonMsg($status, $message, $name = '')
-{
+function jsonMsg($status, $message, $name = ''){
     $arr['status'] = $status;
     $arr['message'] = $message;
     $arr['name'] = $name;
     echo json_encode($arr);
 }
 
-//Test Connection - check whther the given username and passwords are correct
-if ($get_action == "db_name") {
-    //Check the settings file for database name
-    $settings_file = fopen("../../../genie_files/settings", "r") or die("Unable to open file!");
-    $db_name = fgets($settings_file);
-    fclose($settings_file);
-    ($db_name == false) ? $db_name = "" : $db_name = $db_name;
-    //Make a connection
-    $conn = mysqli_connect($host, $username, $password);
-    // Check connection
-    if (!$conn) {
-        jsonMsg('error', "Connection failed: " . mysqli_connect_error);
-        die("Connection failed: " . mysqli_connect_error);
-    } else {
-        jsonMsg('success', "Database server connection was established.", $db_name);
-    }
+//if the settings file exist save the settings
+function saveSettings(){
+  $genieCrypt=new genieCrypt();
+    $data = array(
+        'settings' => array(
+            'host' =>  trim($_POST['host']),
+            'username' => trim($_POST['username']),
+            'password' => $genieCrypt->EncryptThis(trim($_POST['password'])),
+            'database' => trim($_POST['database']),
+            'species' => trim($_POST['species'])
+        )
+    );
+    write_php_ini($data, "../../../genie_files/settings") ;
+    readInifile();
 }
 
-
-//Create a new database depending on the given name
-if ($get_action == "create_database") {
-    //Make a connection
-    $link = mysqli_connect($host, $username, $password);
-    if (!$link) {
-        jsonMsg('error', "Wrong username and or password");
-        exit;
-        
-    } else {
-        if (!mysqli_select_db($link, $database)) {
-            $sql = "CREATE DATABASE " . $database;
-            // $sql = "CREATE DATABASE ".$database.";GRANT SELECT ON ".$database.".* TO ".$username."@'".$host."';GRANT INSERT,UPDATE,DELETE ON ".$database.".genebaskets TO ".$username."@'".$host."';GRANT INSERT,UPDATE,DELETE ON ".$database.".defaultgenebaskets TO ".$username."@'".$host."';";
-            if ($link->query($sql) === true) {
-                jsonMsg('success', "<strong>" . $database . "</strong> database was created",$database );
-                mysqli_close($link);
-                load_sql($host, $username, $password, $database, $get_name);
-            } else {
-                jsonMsg('error', "Not enough permssion to create <strong>" . $database . "</strong> database",$database );
-                mysqli_close($link);
-            }
-        } else {
-            jsonMsg('success', "Database <strong>" . $database . "</strong> already exist",$database );
-            mysqli_close($link);
+function write_php_ini($array, $file)
+{
+    $res = array();
+    foreach($array as $key => $val){
+        if(is_array($val)){
+            $res[] = "[$key]";
+            foreach($val as $skey => $sval) $res[] = "$skey = ".(is_numeric($sval) ? $sval : '"'.$sval.'"');
         }
+        else $res[] = "$key = ".(is_numeric($val) ? $val : '"'.$val.'"');
+    }
+    safefilerewrite($file, implode("\r\n", $res));
+}
+
+function safefilerewrite($fileName, $dataToSave){    
+    if ($fp = fopen($fileName, 'w')){
+        $startTime = microtime(TRUE);
+        do
+        {            
+            $canWrite = flock($fp, LOCK_EX);
+           // If lock not obtained sleep for 0 - 100 milliseconds, to avoid collision and CPU load
+           if(!$canWrite) usleep(round(rand(0, 100)*1000));
+        } while ((!$canWrite)and((microtime(TRUE)-$startTime) < 5));
+
+        //file was locked so now we can store information
+        if ($canWrite) {            
+            fwrite($fp, $dataToSave);
+            flock($fp, LOCK_UN);
+        }
+        fclose($fp);
     }
 
 }
+
+
 
 //Drop exsisting database
 if ($get_action == "drop_database") {
+    //saveSettings();
     //Make a connection
-    $link = mysqli_connect($host, $username, $password);
+  $link = mysqli_connect($host, $username, $password);
     if (!$link) {
         jsonMsg('error', "Wrong username and or password");
         exit;
@@ -78,78 +152,33 @@ if ($get_action == "drop_database") {
         } else {
             $sql = "DROP DATABASE " . $database;
             $link->query($sql);
-            saveSettings("");
             jsonMsg('success', "<strong>" . $database . "</strong> database was deleted");
         }
     }
 }
 
 
-//clone_database
-if ($get_action == "clone_database") {
-    $link = mysqli_connect($host, $username, $password);
-    if (!$link) {
-        jsonMsg('error', "Wrong username and or password");
-        exit;
-    } else {
-        if (!mysqli_select_db($link, $database)) {
-            $sql = "CREATE DATABASE " . $database;
-            if ($link->query($sql) === true) {
-                jsonMsg('success', "<strong>" . $database . "</strong> database was created  with $get_name data",$database );
-                mysqli_close($link);
-                load_sql($host, $username, $password, $database, $get_name);
-            } else {
-                jsonMsg('error', "Not enough permssion to create <strong>" . $database . "</strong> database",$database );
-                mysqli_close($link);
-            }
-        } else {
-            $sqlx = "DROP DATABASE " . $database;
-            if ($link->query($sqlx) === true) {
-                $link->query($sqlx);
-                $sql = "CREATE DATABASE " . $database;
-                jsonMsg('success', "<strong>" . $database . "</strong> already exist but created a new database with $get_name data",$database );
-                mysqli_close($link);
-                load_sql($host, $username, $password, $database, $get_name);
-            } else {
-                jsonMsg('error', "Not enough permssion to drop or create <strong>" . $database . "</strong> database",$database );
-                mysqli_close($link);
-            }
-            mysqli_close($link);
-        }
+//Create a new database depending on the given name
+if ($get_action == "create_database") {
+   $link = mysqli_connect($host, $username, $password);
+   $sql = "CREATE DATABASE " . $database;
+    if ($link->query($sql) === true) {
+        mysqli_close($link);
+        load_sql($host, $username, $password, $database, $get_name);
+        jsonMsg('success', "<strong>" . $database . "</strong> database was created", $database);
+    }else{
+        jsonMsg('warning', "Database <strong>" . $database . "</strong> already exist", $database);
     }
-
-}
-
-function downloadZipFile($url, $filepath){
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_HEADER, 1);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_BINARYTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 0);
-    $raw_file_data = curl_exec($ch);
-
-    if(curl_errno($ch)){
-       echo 'error:' . curl_error($ch);
-    }
-    curl_close($ch);
-
-    file_put_contents($filepath, $raw_file_data);
-    return (filesize($filepath) > 0)? true : false;
+    mysqli_close($link);
 }
 
 
 
 // load MySQL dump file into the database
-function load_sql($host, $username, $password, $database, $get_name)
-{
+function load_sql($host, $username, $password, $database, $get_name){
+$url = "http://build.plantgenie.org/databases/".$get_name.".sql";
+$file_name = $get_name.".sql";
 
-    if ($get_name == "dump") {
-        $url = "http://build.plantgenie.org/tmp/dump/dump.sql";
-        $file_name = "dump.sql";
-    } else {
-        $url = "http://build.plantgenie.org/tmp/Athaliana_447/Athaliana_447.sql";
-        $file_name = "Athaliana_447.sql";
-    }
     //$url="http://build.plantgenie.org/tmp/".$key."/".$file_name;
     $targetFile = fopen($file_name, 'w');
 
@@ -185,12 +214,12 @@ function load_sql($host, $username, $password, $database, $get_name)
     $sql = file_get_contents($script_path);
     if (mysqli_multi_query($conn, $sql)) {
         do {
-            /* store first result set */
+            //store first result set 
             if ($result = mysqli_store_result($conn)) {
                 //do nothing since there's nothing to handle
                 mysqli_free_result($result);
             }
-            /* print divider */
+            //print divider 
             if (mysqli_more_results($conn)) {
                 //I just kept this since it seems useful
                 //try removing and see for yourself
@@ -198,125 +227,96 @@ function load_sql($host, $username, $password, $database, $get_name)
         } while (mysqli_next_result($conn));
     }
 
-    saveSettings($database);
+    //saveSettings($database);
     #User permissions:
     $conn->query("CREATE USER IF NOT EXISTS geniecmsuser@'" . $host . "' IDENTIFIED BY 'geniepass'; ");
     $conn->query("GRANT ALL ON " . $database . ".* TO geniecmsuser@'" . $host . "';"); //ALL replace with SELECT
     //$conn->query("GRANT INSERT,UPDATE,DELETE ON ".$database.".genebaskets TO geniecmsuser@'".$host."';");
     //$conn->query("GRANT INSERT,UPDATE,DELETE ON ".$database.".defaultgenebaskets TO geniecmsuser@'".$host."';");
     exec("rm -r $file_name");
-
-    if (!file_exists('upload')) {
+    if (!file_exists('upload')) { 
         mkdir('upload', 0777, true);
     }
 
+    download_blast_indices($get_name);
+
 }
 
-/*if the settings file exist save the settings*/
-function saveSettings($s)
-{
-    $file = @fopen("../../../genie_files/settings", 'w');
-    if (!$file) {
-        echo "Error opening settings. Set correct permissions (644) to the settings file.";
-        exit;
-    }
-    fwrite($file, $s);
-    fclose($file);
+// This function will download the pre generated blast indices from remote server
+function download_blast_indices($get_name) { 
+    ini_set('max_execution_time', 3000);
+    $data_dir=dirname(__FILE__)."../../../data"; 
+    if (!file_exists($data_dir."/bin")) {
+        $data_dir="../../../data/blast";
+        $zip_file="blast.zip";
+        download__compressed("http://build.plantgenie.org/blast/".$get_name."/blast.zip",$zip_file,$data_dir);
+    }else{
+        //echo "b"; 
+    } 
+   
 }
 
-//Upload GFF3 file
-if ($get_action == "upload_gff3") {
-    // CHANGE THE UPLOAD LIMITS
-    ini_set('upload_max_filesize', '500M');
-    ini_set('post_max_size', '500M');
-    ini_set('max_input_time', 10000);
-    ini_set('max_execution_time', 10000);
+function download__compressed($url,$zipFile,$extractDir){
+    ini_set('max_execution_time', 3000); 
+	$zipResource = fopen($zipFile, "w");
+    
+    // Get The Zip File From Server
+    $ch = curl_init();
 
-    $arr_file_types = ['image/png', 'image/gif', 'image/jpg', 'image/jpeg'];
+	curl_setopt($ch, CURLOPT_URL, $url);
+	curl_setopt($ch, CURLOPT_FAILONERROR, true);
+	curl_setopt($ch, CURLOPT_HEADER, 0);
+	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+	curl_setopt($ch, CURLOPT_AUTOREFERER, true);
+	curl_setopt($ch, CURLOPT_BINARYTRANSFER,true);
+	curl_setopt($ch, CURLOPT_TIMEOUT, 1000);
+	curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0); 
+	curl_setopt($ch, CURLOPT_FILE, $zipResource);
+    $page = curl_exec($ch);
+    
+	if(!$page) {
+		echo "Error :- ".curl_error($ch);
+	}
+	curl_close($ch);
 
-    if ($_FILES["file"]["size"] == 0) {
-/*     if (!(in_array($_FILES['file']['type'], $arr_file_types))) {*/
-        echo "false";
-        return;
-    }
-    move_uploaded_file($_FILES['file']['tmp_name'], 'upload/' . $_FILES['file']['name']);
-    exec("awk '$3==\"gene\"{g=$4\" \"$5}$3~/RNA$/{split($9,a,/[;=]/);for(i=1;i in a;i+=2)k[a[i]]=a[i+1]; print k[\"ID\"], k[\"Parent\"], \"desc\", $1, $7, $4, $5, g}' " . 'upload/' . $_FILES['file']['name'] . " >" . 'upload/' . $_FILES['file']['name'] . "_transcript.tsv");
-    exec("awk '/gene/{split($9,a,\"ID=\");split(a[2],b,\";\");print b[1],$1,$4,$5}' FS='\t' OFS='\t' " . 'upload/' . $_FILES['file']['name'] . " >" . 'upload/' . $_FILES['file']['name'] . "_gene.tsv");
-    load_files('upload/' . $_FILES['file']['name'] . "_gene.tsv", 'gene_info');
+	/* Open the Zip file */
+	$zip = new ZipArchive;
+	$extractPath = $extractDir;
+
+	if($zip->open($zipFile) != "true"){
+		echo "Error :- Unable to open the Zip File";
+	}
+
+	/* Extract Zip File */
+	$zip->extractTo($extractPath);
+    $zip->close();
+    unlink($zipFile);
+
+    chmodifyr($extractPath."/");
+   
+	//die('Your file was downloaded and extracted '.$extractPath.', go check.');
 }
 
-//Loading tables
-function load_files($input_file, $table_name)
-{
-    //$input_file=getcwd().'/../tmp/'.$folder.'/'.$table_name.'.txt';
-    // $database=$source;
-    //echo $input_file, $table_name;
 
-    //Build the connection
-    include dirname(__FILE__) . '/geniesys/plugins/settings.php';
-    $private_url = parse_url($db_url['genelist']);
-    $conn = new mysqli($private_url['host'], $private_url['user'], $private_url['pass'], str_replace('/', '', $private_url['path']));
-    // Check connection
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
-    }
 
-    //Truncate and load table
-    $query = <<<eof
-TRUNCATE TABLE $table_name;
-ALTER TABLE $table_name AUTO_INCREMENT = 1;
-load data local infile '$input_file' ignore  INTO TABLE $table_name CHARACTER SET UTF8 fields terminated by '\t' LINES TERMINATED BY '\n' ignore 0 lines;
-eof;
-    /* execute multi query */
-    if (mysqli_multi_query($conn, $query)) {
-        do {
-            /* store first result set */
-            if ($result = mysqli_store_result($conn)) {
-                //do nothing since there's nothing to handle
-                mysqli_free_result($result);
-            }
-            /* print divider */
-            if (mysqli_more_results($conn)) {
-                //I just kept this since it seems useful
-                //try removing and see for yourself
-            }
-        } while (mysqli_next_result($conn));
-    }
-    mysqli_close($conn);
-}
+function chmodify($obj) {
+    $chunks = explode('/', $obj);
+    chmod($obj, is_dir($obj) ? 0755 : 0755);
+    chown($obj, $chunks[2]);
+    chgrp($obj, $chunks[2]);
+   
+ }
 
-$output_dir = "upload/";
-if (isset($_FILES["myfile"])) {
-    // CHANGE THE UPLOAD LIMITS
-    ini_set('upload_max_filesize', '500M');
-    ini_set('post_max_size', '500M');
-    ini_set('max_input_time', 10000);
-    ini_set('max_execution_time', 10000);
-    $ret = array();
 
-//    This is for custom errors;
-    /*    $custom_error= array();
-    $custom_error['jquery-upload-file-error']="File already exists";
-    echo json_encode($custom_error);
-    die();
-     */
-    $error = $_FILES["myfile"]["error"];
-    //You need to handle  both cases
-    //If Any browser does not support serializing of multiple files using FormData()
-    if (!is_array($_FILES["myfile"]["name"])) //single file
-    {
-        $fileName = $_FILES["myfile"]["name"];
-        move_uploaded_file($_FILES["myfile"]["tmp_name"], $output_dir . $fileName);
-        $ret[] = $fileName;
-    } else //Multiple files, file[]
-    {
-        $fileCount = count($_FILES["myfile"]["name"]);
-        for ($i = 0; $i < $fileCount; $i++) {
-            $fileName = $_FILES["myfile"]["name"][$i];
-            move_uploaded_file($_FILES["myfile"]["tmp_name"][$i], $output_dir . $fileName);
-            $ret[] = $fileName;
+ function chmodifyr($dir) 
+ {
+    if($objs = glob($dir."/*")) {        
+        foreach($objs as $obj) {
+            chmodify($obj);
+            if(is_dir($obj)) chmodifyr($obj);
         }
-
     }
-    echo json_encode($ret);
-}
+   
+  //  return chmodify($dir);
+ }   
