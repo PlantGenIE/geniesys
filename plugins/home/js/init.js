@@ -67,12 +67,12 @@ function tab_opration(str){
         // code block
         break;  
       case "Database settings":
-        db_operation("db_name", "check");
+        read_ini_file();
+        //db_operation("db_name", "check_connection");
         break;
       case "Annotation":
        // db_operation("db_name", "check");
         check_files();
-        
         break;  
       case "Expression":
         check_expression_files();
@@ -86,80 +86,110 @@ function tab_opration(str){
     }
 }
 
-/** DATABASE **/
-$("#create_db").click(function () {
-    db_operation("create_database", "dump");
+// Refresh if there in no content added in home page
+function fill_input_text(){
+  if($("#tab-container .tab.active")[0].innerText =="Edit page"){
+    if(CKEDITOR.instances.editor!=undefined){
+    location.reload();
+    }
+  }
+}
+
+//Fill input boxes on admin page
+function read_ini_file() {
+  var finalvarx = "action=read_settings_ini";
+  $.ajax({
+    type: "POST",
+    url: "plugins/home/service/db_settings.php",
+    data: (finalvarx),
+    dataType: 'json',
+    success: function (data) {
+      passStatus(data.status);
+      $("#mhost").val(JSON.parse(data.name).host);
+      $("#musername").val(JSON.parse(data.name).user); 
+      $("#mpassword").val(JSON.parse(data.name).pass);
+      $("#mdbname").val(JSON.parse(data.name).database);
+      $("#mspeciesname").val(JSON.parse(data.name).species);
+      setCookie("species_name", JSON.parse(data.name).species, 10);
+    }
+    });
+}
+
+// Trigger changes to admin input controls
+$("#db_form input").on("input", function(e) {
+  var input = $(this);
+  var val = input.val();
+  if (input.data("lastval") != val) {
+    input.data("lastval", val);
+    save_ini_file()
+  }
 });
-$("#create_db_arabidopsis").click(function () {
-    db_operation("create_database", "artha");
-    download_indices("create_database", "dump");
-});
+
+
+//save init file
+function save_ini_file(){
+  var mhost = $('#mhost').val();
+  var musername = $('#musername').val();
+  var mpasswd = $('#mpassword').val();
+  var mdbname = $('#mdbname').val();
+  var mspeciesname = $('#mspeciesname').val();
+  var finalvarx = "host=" + mhost + "&username=" + musername + "&password=" + mpasswd + "&database=" + mdbname + "&species=" + mspeciesname + "&action=save_ini_file";
+  $.ajax({
+      type: "POST",
+      url: "plugins/home/service/db_settings.php",
+      data: (finalvarx),
+      dataType: 'json',
+      success: function (data) {
+        passStatus(data.status);
+        setCookie("species_name", mspeciesname, 10);
+      }
+  });
+
+}
+
+
+
+// Pass status to the visual elements
+function passStatus(status){
+  disable_easytabs(tabs, [3,4,5]);
+  if(status=="error"){
+    //Connection failed Wrong username or Password
+  
+    $("#drop_db").hide();
+    $("#db_span").html("<font color='red'> &#9432; Wrong username or password. Please type in correct username and password. </font>");
+    $("#clone_div").hide(); 
+ }else{
+   //Connection successful
+   if(status=="success"){
+     $("#drop_db").show();
+     enable_all();
+     $("#db_span").html(" <font color='green'> &#9432;  Database created. You can click below phpMyAdmin link to see more details.</font>");
+     $("#clone_div").hide(); 
+   }else{
+
+     $("#drop_db").hide();
+     $("#db_span").html(" <font color='orange'> &#9432; Database does not exist, but you can create a new database.</font>");
+     $("#clone_div").show(); 
+   }
+ }
+}
+
 $("#drop_db").click(function () {
-    db_operation("drop_database", "drop");
+  db_operation("drop_database", "drop");
 });
+
 
 // Cloning 
 function clone_genome(t) {
-  if( t.id=="artha"){
-    db_operation("clone_database", t.id);
-  }else{
-    alert("This button will allow you to clone the existing "+t.id+" database into your database in the future","clone download");
-  }
-  
+   db_operation("create_database", t.id);
+   $("#mspeciesname").val(t.innerText);
+   save_ini_file(); 
  };
 
- $("#myadmin_links").click(function () {
-     window.open("http://" + $('#mhost').val() + "/phpmyadmin/db_structure.php?db=" + $('#mdbname').val(), '_blank');
- });
- $("#myadmin_links_annotation").click(function () {
-  window.open("http://" + $('#mhost').val() + "/phpmyadmin/db_structure.php?db=" + $('#mdbname').val(), '_blank');
-});
-$("#myadmin_links_expression").click(function () {
-  window.open("http://" + $('#mhost').val() + "/phpmyadmin/db_structure.php?db=" + $('#mdbname').val(), '_blank');
-});
-
- //Check database
- function db_operation(action, name) {
-   if(action!="clone_database"){on_disable_b_and_c_clicked();}
-   $(".loader-wrap").show();
-     mhost = $('#mhost').val();
-     musername = $('#musername').val();
-     mpasswd = $('#mpassword').val();
-     mdbname = $('#mdbname').val();
-     var finalvarx = "host=" + mhost + "&username=" + musername + "&password=" + mpasswd + "&database=" + mdbname + "&action=" + action + "&name=" + name;
-     $.ajax({
-         type: "POST",
-         url: "plugins/home/service/db_settings.php",
-         data: (finalvarx),
-         dataType: 'json',
-         success: function (data) {
-          $(".loader-wrap").hide();
-//            toastr.options = { "closeButton": false, "debug": false, "positionClass": "toast-top-right", "onclick": null, "showDuration": "10000", "hideDuration": "1000", "timeOut": "40000", "extendedTimeOut": "0", "showEasing": "linear", "hideEasing": "linear", "showMethod": "fadeIn", "hideMethod": "fadeOut" }
-             if (data.status == "success") {
-                 toastr.success(data.message, "Success");
-                 if(data.name!=""){
-                 enable_all();
-                 if(name=="check" && $("#tab-container .tab.active")[0].innerText =="Annotation"){$("#database_checkbox").prop("checked", true);}
-                }
-             } else {
-                 toastr.error(data.message, "Failure");
-                 on_disable_b_and_c_clicked();
-                 $("#database_checkbox").prop("checked", false)
-             }
-             if (action == "db_name") {
-                 $("#mdbname").val(data.name);
-             }
-         },
-         error: function (data) { 
-            if(data.status!=""){
-             on_disable_b_and_c_clicked();}
-         }
-     });
- }
-
-
-//Download indices
-function download_indices(action, name) {
+//Check database
+function db_operation(action, name) {
+  if(action!="clone_database"){on_disable_b_and_c_clicked();}
+  $(".loader-wrap").show();
     mhost = $('#mhost').val();
     musername = $('#musername').val();
     mpasswd = $('#mpassword').val();
@@ -167,20 +197,46 @@ function download_indices(action, name) {
     var finalvarx = "host=" + mhost + "&username=" + musername + "&password=" + mpasswd + "&database=" + mdbname + "&action=" + action + "&name=" + name;
     $.ajax({
         type: "POST",
-        url: "plugins/home/service/download_indices.php",
+        url: "plugins/home/service/db_settings.php",
         data: (finalvarx),
         dataType: 'json',
         success: function (data) {
-            toastr.options = { "closeButton": false, "debug": false, "positionClass": "toast-top-right", "onclick": null, "showDuration": "10000", "hideDuration": "1000", "timeOut": "40000", "extendedTimeOut": "0", "showEasing": "linear", "hideEasing": "linear", "showMethod": "fadeIn", "hideMethod": "fadeOut" }
-            console.log(data)
-            if (data > 10) {
-                toastr.success("download and indexed fasta files", "Success");
-            } else {
-                toastr.error("remote server failed", "Failure");
-            }
+          $(".loader-wrap").hide();
+          read_ini_file();
+        },
+        error: function (data) { 
+           if(data.status!=""){
+            on_disable_b_and_c_clicked();}
         }
     });
 }
+
+
+//Download indices
+function download_indices(action, name) {
+  mhost = $('#mhost').val();
+  musername = $('#musername').val();
+  mpasswd = $('#mpassword').val();
+  mdbname = $('#mdbname').val();
+  var finalvarx = "host=" + mhost + "&username=" + musername + "&password=" + mpasswd + "&database=" + mdbname + "&action=" + action + "&name=" + name;
+  $.ajax({
+      type: "POST",
+      url: "plugins/home/service/download_indices.php",
+      data: (finalvarx),
+      dataType: 'json',
+      success: function (data) {
+          toastr.options = { "closeButton": false, "debug": false, "positionClass": "toast-top-right", "onclick": null, "showDuration": "10000", "hideDuration": "1000", "timeOut": "40000", "extendedTimeOut": "0", "showEasing": "linear", "hideEasing": "linear", "showMethod": "fadeIn", "hideMethod": "fadeOut" }
+          console.log(data)
+          if (data > 10) {
+              toastr.success("download and indexed fasta files", "Success");
+          } else {
+              toastr.error("remote server failed", "Failure");
+          }
+      }
+  });
+}
+
+
 
 /** ANNOTATION **/
 // Check files are in the data folder
@@ -300,9 +356,11 @@ function annotation_update_gene_i(){
       data: (finalvarx),
       dataType: 'json',
       success: function (data) {
+      
         $("#update_gene_i_waiting").hide();
       },
       complete: function(xhr, textStatus) {
+      
         $("#update_gene_i_waiting").hide();
     } 
   }); 
@@ -427,10 +485,18 @@ function load_expression_table(tmp_name){
   });  
   }
 
-
-
 // Help
-
 function go_to_help(t){
   console.log(t)
 }
+
+
+$("#myadmin_links").click(function () {
+  window.open("/phpmyadmin/db_structure.php?db=" + $('#mdbname').val(), '_blank');
+});
+$("#myadmin_links_annotation").click(function () {
+window.open("/phpmyadmin/db_structure.php?db=" + $('#mdbname').val(), '_blank');
+});
+$("#myadmin_links_expression").click(function () {
+window.open( "/phpmyadmin/db_structure.php?db=" + $('#mdbname').val(), '_blank');
+});

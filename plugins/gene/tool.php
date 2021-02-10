@@ -19,14 +19,14 @@
         <td>Transcript name:</td>
         <td id="transcript_id">&nbsp;</td>
       </tr>
-      <tr>
+  <!--     <tr>
         <td>Protein name:</td>
         <td id="peptide_name">&nbsp;</td>
       </tr>
-      <tr>
+     <tr>
         <td>PAC Transcript ID:</td>
         <td id="pac_id">&nbsp;</td>
-      </tr>
+      </tr>-->
       <tr>
         <td>Start position:</td>
         <td id="start">&nbsp;</td>
@@ -43,7 +43,7 @@
         <td>Other transcripts at this locus:</td>
         <td id="other_tids">&nbsp;</td>
       </tr> 
-      </tr>    
+    <!--  </tr>    
         <tr id="atg_ids_tr">
         <td>Arabidopsis Id:</td>
         <td id="atg_id">&nbsp;</td>
@@ -52,7 +52,7 @@
         <tr id="potri_id_tr">
         <td>Poplar Id:</td>
         <td id="potri_id">&nbsp;</td>
-      </tr>             
+      </tr>        -->     
     </table>
         </div>  
         <div id="sequence">

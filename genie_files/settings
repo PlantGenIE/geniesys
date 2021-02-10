@@ -1,1 +1,6 @@
-geniesys_eugra
+[settings]
+host = "localhost"
+username = "admin"
+password = "K3ROMDN2QWNYZjhETlN2UkdqV05Fdz09OjoBgghqtZh4vzO1XB0qcFYW"
+database = "piabi"
+species = "Picea abies"
